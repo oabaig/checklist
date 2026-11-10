@@ -197,7 +197,9 @@
   </main>
 
   <script>
+    const CHECKLISTS_STORAGE_KEY = "checklists";
     const ACTIVE_LIST_STORAGE_KEY = "activeChecklistId";
+    const DEFAULT_LIST_NAME = "Checklist";
 
     const listTabsElement = document.getElementById("list-tabs");
     const newListButton = document.getElementById("new-list-button");
@@ -213,22 +215,34 @@
     let checklists = [];
     let activeListId = null;
     let renamingListId = null;
-    let isCreatingList = false;
 
     function getActiveList() {
       return checklists.find((checklist) => checklist.id === activeListId);
     }
 
-    async function sendApiRequest(method, url, requestBody) {
-      const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: requestBody ? JSON.stringify(requestBody) : undefined,
-      });
-      if (!response.ok) {
-        throw new Error(`Request failed with status ${response.status}`);
+    // crypto.randomUUID is only available on HTTPS and localhost, so build IDs by hand.
+    function createId() {
+      return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    }
+
+    function createChecklist(listName) {
+      return { id: createId(), name: listName, items: [] };
+    }
+
+    function loadStoredChecklists() {
+      try {
+        const storedChecklists = JSON.parse(localStorage.getItem(CHECKLISTS_STORAGE_KEY));
+        if (Array.isArray(storedChecklists) && storedChecklists.length > 0) {
+          return storedChecklists;
+        }
+      } catch (parseError) {
+        console.error("Could not parse saved checklists, starting with an empty list:", parseError);
       }
-      return response.status === 204 ? null : response.json();
+      return [createChecklist(DEFAULT_LIST_NAME)];
+    }
+
+    function saveChecklists() {
+      localStorage.setItem(CHECKLISTS_STORAGE_KEY, JSON.stringify(checklists));
     }
 
     function renderTabs() {
@@ -410,7 +424,7 @@
       focusActiveTab();
     }
 
-    async function finishRenaming(checklist, newListName, { shouldFocusTab }) {
+    function finishRenaming(checklist, newListName, { shouldFocusTab }) {
       // Enter and blur can both fire for one rename; only the first one counts.
       if (renamingListId !== checklist.id) {
         return;
@@ -418,8 +432,8 @@
       renamingListId = null;
       const trimmedListName = newListName.trim();
       if (trimmedListName && trimmedListName !== checklist.name) {
-        const updatedList = await sendApiRequest("PATCH", `/api/lists/${checklist.id}`, { name: trimmedListName });
-        checklist.name = updatedList.name;
+        checklist.name = trimmedListName;
+        saveChecklists();
       }
       renderTabs();
       if (shouldFocusTab) {
@@ -427,23 +441,15 @@
       }
     }
 
-    async function createList() {
-      // Ignore repeat presses while the server is still creating the previous list.
-      if (isCreatingList) {
-        return;
-      }
-      isCreatingList = true;
-      try {
-        const createdList = await sendApiRequest("POST", "/api/lists", { name: `List ${checklists.length + 1}` });
-        checklists.push(createdList);
-        localStorage.setItem(ACTIVE_LIST_STORAGE_KEY, createdList.id);
-        startRenaming(createdList.id);
-      } finally {
-        isCreatingList = false;
-      }
+    function createList() {
+      const createdList = createChecklist(`List ${checklists.length + 1}`);
+      checklists.push(createdList);
+      saveChecklists();
+      localStorage.setItem(ACTIVE_LIST_STORAGE_KEY, createdList.id);
+      startRenaming(createdList.id);
     }
 
-    async function deleteActiveList() {
+    function deleteActiveList() {
       const activeList = getActiveList();
       if (checklists.length <= 1) {
         return;
@@ -453,26 +459,24 @@
         return;
       }
       const deletedListIndex = checklists.indexOf(activeList);
-      await sendApiRequest("DELETE", `/api/lists/${activeList.id}`);
       checklists = checklists.filter((checklist) => checklist.id !== activeList.id);
+      saveChecklists();
       activateList(checklists[Math.min(deletedListIndex, checklists.length - 1)].id);
       focusActiveTab();
     }
 
-    async function toggleItemCompleted(checklist, checklistItem) {
-      const updatedItem = await sendApiRequest("PATCH", `/api/lists/${checklist.id}/items/${checklistItem.id}`, {
-        completed: !checklistItem.completed,
-      });
-      checklistItem.completed = updatedItem.completed;
+    function toggleItemCompleted(checklist, checklistItem) {
+      checklistItem.completed = !checklistItem.completed;
+      saveChecklists();
       renderItems();
       checklistElement.querySelector(`[data-item-id="${checklistItem.id}"] input`)?.focus();
     }
 
-    async function deleteItem(checklist, checklistItem) {
+    function deleteItem(checklist, checklistItem) {
       const wasFocusInsideList = checklistElement.contains(document.activeElement);
       const deletedItemIndex = checklist.items.indexOf(checklistItem);
-      await sendApiRequest("DELETE", `/api/lists/${checklist.id}/items/${checklistItem.id}`);
       checklist.items = checklist.items.filter((existingItem) => existingItem.id !== checklistItem.id);
+      saveChecklists();
       renderItems();
 
       // Keep focus in the list so keyboard users can continue from the same position.
@@ -486,8 +490,8 @@
       }
     }
 
-    async function loadChecklists() {
-      checklists = await sendApiRequest("GET", "/api/lists");
+    function loadChecklists() {
+      checklists = loadStoredChecklists();
       const storedActiveListId = localStorage.getItem(ACTIVE_LIST_STORAGE_KEY);
       const storedListStillExists = checklists.some((checklist) => checklist.id === storedActiveListId);
       activeListId = storedListStillExists ? storedActiveListId : checklists[0].id;
@@ -499,20 +503,17 @@
     renameListButton.addEventListener("click", () => startRenaming(activeListId));
     deleteListButton.addEventListener("click", deleteActiveList);
 
-    newItemForm.addEventListener("submit", async (submitEvent) => {
+    newItemForm.addEventListener("submit", (submitEvent) => {
       submitEvent.preventDefault();
       const activeList = getActiveList();
       const newItemText = newItemTextInput.value.trim();
       if (!newItemText) {
         return;
       }
-      // Clear before the request so text typed while it is in flight is kept.
+      activeList.items.push({ id: createId(), text: newItemText, completed: false });
+      saveChecklists();
       newItemTextInput.value = "";
-      const createdItem = await sendApiRequest("POST", `/api/lists/${activeList.id}/items`, { text: newItemText });
-      activeList.items.push(createdItem);
-      if (activeList.id === activeListId) {
-        renderItems();
-      }
+      renderItems();
     });
 
     document.addEventListener("keydown", (keyboardEvent) => {

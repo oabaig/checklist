@@ -1,16 +1,7 @@
 const { test, expect } = require("@playwright/test");
 
-// Reset the server to a single empty list named "Checklist" before each test.
-test.beforeEach(async ({ page, request }) => {
-  const existingLists = await (await request.get("/api/lists")).json();
-  const [firstList, ...otherLists] = existingLists;
-  for (const otherList of otherLists) {
-    await request.delete(`/api/lists/${otherList.id}`);
-  }
-  for (const existingItem of firstList.items) {
-    await request.delete(`/api/lists/${firstList.id}/items/${existingItem.id}`);
-  }
-  await request.patch(`/api/lists/${firstList.id}`, { data: { name: "Checklist" } });
+// Each test gets a new browser context, so localStorage starts empty.
+test.beforeEach(async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("tab", { name: "Checklist" })).toBeVisible();
 });
@@ -305,4 +296,11 @@ test.describe("keyboard only", () => {
       await expect(expectedFocusedElement).toBeFocused();
     }
   });
+});
+
+test("unreadable saved data falls back to an empty list", async ({ page }) => {
+  await page.evaluate(() => localStorage.setItem("checklists", "{not valid json"));
+  await page.reload();
+  await expect(page.getByRole("tab")).toHaveText(["Checklist"]);
+  await expect(page.locator("#progress-summary")).toHaveText("No items yet.");
 });
