@@ -1,0 +1,14 @@
+{
+  "name": "checklist-app",
+  "version": "1.0.0",
+  "description": "A simple checklist app with no external dependencies",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "playwright test"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.65.0"
+  }
+}
