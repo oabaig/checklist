@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checklists</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f4f4f5;
+      color: #18181b;
+      margin: 0;
+      padding: 40px 16px;
+    }
+    main {
+      max-width: 560px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      margin-top: 0;
+    }
+    :focus-visible {
+      outline: 2px solid #2563eb;
+      outline-offset: 2px;
+    }
+    .tab-bar {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      border-bottom: 1px solid #d4d4d8;
+      margin-bottom: 16px;
+    }
+    [role="tablist"] {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      flex: 1;
+    }
+    [role="tab"] {
+      padding: 8px 12px;
+      font-size: 0.95rem;
+      border: 1px solid transparent;
+      border-bottom: none;
+      border-radius: 6px 6px 0 0;
+      background: transparent;
+      color: #52525b;
+      cursor: pointer;
+    }
+    [role="tab"][aria-selected="true"] {
+      background: #fff;
+      border-color: #d4d4d8;
+      color: #18181b;
+      font-weight: 600;
+      margin-bottom: -1px;
+    }
+    .rename-input {
+      padding: 6px 8px;
+      font-size: 0.95rem;
+      border: 1px solid #2563eb;
+      border-radius: 4px;
+      margin-bottom: 4px;
+    }
+    form {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    input[type="text"] {
+      flex: 1;
+      padding: 8px;
+      font-size: 1rem;
+      border: 1px solid #d4d4d8;
+      border-radius: 4px;
+    }
+    button {
+      padding: 8px 12px;
+      font-size: 1rem;
+      border: none;
+      border-radius: 4px;
+      background: #2563eb;
+      color: #fff;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: transparent;
+      color: #2563eb;
+      font-size: 0.9rem;
+      padding: 4px 8px;
+    }
+    button.danger {
+      background: transparent;
+      color: #dc2626;
+      font-size: 0.9rem;
+      padding: 4px 8px;
+    }
+    button:disabled {
+      color: #a1a1aa;
+      cursor: not-allowed;
+    }
+    #new-list-button {
+      margin-bottom: 4px;
+    }
+    .list-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid #e4e4e7;
+    }
+    li label {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    li.completed span {
+      text-decoration: line-through;
+      color: #a1a1aa;
+    }
+    #progress-summary,
+    #keyboard-help {
+      margin-top: 16px;
+      color: #71717a;
+      font-size: 0.9rem;
+    }
+    #keyboard-help table {
+      border-collapse: collapse;
+      margin-top: 8px;
+    }
+    #keyboard-help td {
+      padding: 2px 12px 2px 0;
+      vertical-align: top;
+    }
+    kbd {
+      font-family: ui-monospace, monospace;
+      font-size: 0.85em;
+      background: #f4f4f5;
+      border: 1px solid #d4d4d8;
+      border-radius: 3px;
+      padding: 0 4px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Checklists</h1>
+    <div class="tab-bar">
+      <div role="tablist" id="list-tabs" aria-label="Checklists"></div>
+      <button type="button" id="new-list-button" class="secondary">+ New list</button>
+    </div>
+
+    <section role="tabpanel" id="checklist-panel">
+      <div class="list-actions">
+        <button type="button" id="rename-list-button" class="secondary">Rename list</button>
+        <button type="button" id="delete-list-button" class="danger">Delete list</button>
+      </div>
+      <form id="new-item-form">
+        <input type="text" id="new-item-text" placeholder="Add an item..." aria-label="New item" autocomplete="off" required>
+        <button type="submit">Add</button>
+      </form>
+      <ul id="checklist"></ul>
+      <p id="progress-summary"></p>
+    </section>
+
+    <details id="keyboard-help">
+      <summary>Keyboard shortcuts</summary>
+      <table>
+        <tr><td><kbd>N</kbd> or <kbd>/</kbd></td><td>Go to the "Add an item" box</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>Leave the text box</td></tr>
+        <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Move between items</td></tr>
+        <tr><td><kbd>Space</kbd> or <kbd>Enter</kbd></td><td>Check or uncheck the focused item</td></tr>
+        <tr><td><kbd>Delete</kbd> or <kbd>Backspace</kbd></td><td>Delete the focused item</td></tr>
+        <tr><td><kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>D</kbd></td><td>Delete the last added item in this list</td></tr>
+        <tr><td><kbd>[</kbd> / <kbd>]</kbd></td><td>Previous / next list</td></tr>
+        <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>Previous / next list (when a tab is focused)</td></tr>
+        <tr><td><kbd>T</kbd></td><td>New list</td></tr>
+        <tr><td><kbd>R</kbd> or <kbd>F2</kbd></td><td>Rename this list (<kbd>Enter</kbd> saves, <kbd>Esc</kbd> cancels)</td></tr>
+        <tr><td><kbd>?</kbd></td><td>Show or hide this help</td></tr>
+      </table>
+    </details>
+  </main>
+
+  <script>
+    const ACTIVE_LIST_STORAGE_KEY = "activeChecklistId";
+
+    const listTabsElement = document.getElementById("list-tabs");
+    const newListButton = document.getElementById("new-list-button");
+    const checklistPanelElement = document.getElementById("checklist-panel");
+    const renameListButton = document.getElementById("rename-list-button");
+    const deleteListButton = document.getElementById("delete-list-button");
+    const newItemForm = document.getElementById("new-item-form");
+    const newItemTextInput = document.getElementById("new-item-text");
+    const checklistElement = document.getElementById("checklist");
+    const progressSummaryElement = document.getElementById("progress-summary");
+    const keyboardHelpElement = document.getElementById("keyboard-help");
+
+    let checklists = [];
+    let activeListId = null;
+    let renamingListId = null;
+    let isCreatingList = false;
+
+    function getActiveList() {
+      return checklists.find((checklist) => checklist.id === activeListId);
+    }
+
+    async function sendApiRequest(method, url, requestBody) {
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: requestBody ? JSON.stringify(requestBody) : undefined,
+      });
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+      return response.status === 204 ? null : response.json();
+    }
+
+    function renderTabs() {
+      listTabsElement.innerHTML = "";
+      for (const checklist of checklists) {
+        if (checklist.id === renamingListId) {
+          const renameInputElement = document.createElement("input");
+          renameInputElement.type = "text";
+          renameInputElement.className = "rename-input";
+          renameInputElement.value = checklist.name;
+          renameInputElement.setAttribute("aria-label", "List name");
+          renameInputElement.addEventListener("keydown", (keyboardEvent) => {
+            if (keyboardEvent.key === "Enter") {
+              keyboardEvent.preventDefault();
+              finishRenaming(checklist, renameInputElement.value, { shouldFocusTab: true });
+            } else if (keyboardEvent.key === "Escape") {
+              keyboardEvent.preventDefault();
+              cancelRenaming();
+            }
+          });
+          renameInputElement.addEventListener("blur", () => {
+            finishRenaming(checklist, renameInputElement.value, { shouldFocusTab: false });
+          });
+          listTabsElement.append(renameInputElement);
+          continue;
+        }
+
+        const isActiveList = checklist.id === activeListId;
+        const tabElement = document.createElement("button");
+        tabElement.type = "button";
+        tabElement.id = `tab-${checklist.id}`;
+        tabElement.setAttribute("role", "tab");
+        tabElement.setAttribute("aria-selected", String(isActiveList));
+        tabElement.setAttribute("aria-controls", "checklist-panel");
+        // Only the active tab is in the Tab order; arrow keys move between tabs.
+        tabElement.tabIndex = isActiveList ? 0 : -1;
+        tabElement.textContent = checklist.name;
+        tabElement.addEventListener("click", () => activateList(checklist.id));
+        tabElement.addEventListener("dblclick", () => startRenaming(checklist.id));
+        tabElement.addEventListener("keydown", handleTabKeydown);
+        listTabsElement.append(tabElement);
+      }
+    }
+
+    function renderItems() {
+      const activeList = getActiveList();
+      checklistElement.innerHTML = "";
+      for (const checklistItem of activeList.items) {
+        const listItemElement = document.createElement("li");
+        listItemElement.dataset.itemId = checklistItem.id;
+        if (checklistItem.completed) {
+          listItemElement.classList.add("completed");
+        }
+
+        const labelElement = document.createElement("label");
+        const checkboxElement = document.createElement("input");
+        checkboxElement.type = "checkbox";
+        checkboxElement.checked = checklistItem.completed;
+        checkboxElement.addEventListener("change", () => toggleItemCompleted(activeList, checklistItem));
+
+        const itemTextElement = document.createElement("span");
+        itemTextElement.textContent = checklistItem.text;
+
+        labelElement.append(checkboxElement, itemTextElement);
+
+        const deleteButtonElement = document.createElement("button");
+        deleteButtonElement.type = "button";
+        deleteButtonElement.className = "danger";
+        deleteButtonElement.textContent = "Delete";
+        deleteButtonElement.setAttribute("aria-label", `Delete ${checklistItem.text}`);
+        deleteButtonElement.addEventListener("click", () => deleteItem(activeList, checklistItem));
+
+        listItemElement.addEventListener("keydown", (keyboardEvent) => {
+          handleItemKeydown(keyboardEvent, activeList, checklistItem);
+        });
+
+        listItemElement.append(labelElement, deleteButtonElement);
+        checklistElement.append(listItemElement);
+      }
+
+      const completedItemCount = activeList.items.filter((checklistItem) => checklistItem.completed).length;
+      progressSummaryElement.textContent = activeList.items.length
+        ? `${completedItemCount} of ${activeList.items.length} completed`
+        : "No items yet.";
+    }
+
+    function render() {
+      renderTabs();
+      renderItems();
+      checklistPanelElement.setAttribute("aria-labelledby", `tab-${activeListId}`);
+      deleteListButton.disabled = checklists.length <= 1;
+    }
+
+    function getItemCheckboxes() {
+      return [...checklistElement.querySelectorAll('input[type="checkbox"]')];
+    }
+
+    function focusActiveTab() {
+      document.getElementById(`tab-${activeListId}`)?.focus();
+    }
+
+    function focusFirstItemOrActiveTab() {
+      const firstItemCheckbox = getItemCheckboxes()[0];
+      if (firstItemCheckbox) {
+        firstItemCheckbox.focus();
+      } else {
+        focusActiveTab();
+      }
+    }
+
+    function activateList(listId) {
+      activeListId = listId;
+      localStorage.setItem(ACTIVE_LIST_STORAGE_KEY, listId);
+      render();
+    }
+
+    function switchListByOffset(offset) {
+      const activeListIndex = checklists.findIndex((checklist) => checklist.id === activeListId);
+      const nextListIndex = (activeListIndex + offset + checklists.length) % checklists.length;
+      activateList(checklists[nextListIndex].id);
+      focusActiveTab();
+    }
+
+    function handleTabKeydown(keyboardEvent) {
+      if (keyboardEvent.key === "ArrowRight") {
+        keyboardEvent.preventDefault();
+        switchListByOffset(1);
+      } else if (keyboardEvent.key === "ArrowLeft") {
+        keyboardEvent.preventDefault();
+        switchListByOffset(-1);
+      } else if (keyboardEvent.key === "Home") {
+        keyboardEvent.preventDefault();
+        activateList(checklists[0].id);
+        focusActiveTab();
+      } else if (keyboardEvent.key === "End") {
+        keyboardEvent.preventDefault();
+        activateList(checklists[checklists.length - 1].id);
+        focusActiveTab();
+      }
+    }
+
+    function handleItemKeydown(keyboardEvent, checklist, checklistItem) {
+      const itemCheckboxes = getItemCheckboxes();
+      const currentItemIndex = checklist.items.indexOf(checklistItem);
+
+      if (keyboardEvent.key === "ArrowDown") {
+        keyboardEvent.preventDefault();
+        itemCheckboxes[Math.min(currentItemIndex + 1, itemCheckboxes.length - 1)].focus();
+      } else if (keyboardEvent.key === "ArrowUp") {
+        keyboardEvent.preventDefault();
+        itemCheckboxes[Math.max(currentItemIndex - 1, 0)].focus();
+      } else if (keyboardEvent.key === "Home") {
+        keyboardEvent.preventDefault();
+        itemCheckboxes[0].focus();
+      } else if (keyboardEvent.key === "End") {
+        keyboardEvent.preventDefault();
+        itemCheckboxes[itemCheckboxes.length - 1].focus();
+      } else if (keyboardEvent.key === "Delete" || keyboardEvent.key === "Backspace") {
+        keyboardEvent.preventDefault();
+        deleteItem(checklist, checklistItem);
+      } else if (keyboardEvent.key === "Enter" && keyboardEvent.target.type === "checkbox") {
+        keyboardEvent.preventDefault();
+        toggleItemCompleted(checklist, checklistItem);
+      }
+    }
+
+    function startRenaming(listId) {
+      activeListId = listId;
+      renamingListId = listId;
+      render();
+      const renameInputElement = listTabsElement.querySelector(".rename-input");
+      renameInputElement.focus();
+      renameInputElement.select();
+    }
+
+    function cancelRenaming() {
+      renamingListId = null;
+      renderTabs();
+      focusActiveTab();
+    }
+
+    async function finishRenaming(checklist, newListName, { shouldFocusTab }) {
+      // Enter and blur can both fire for one rename; only the first one counts.
+      if (renamingListId !== checklist.id) {
+        return;
+      }
+      renamingListId = null;
+      const trimmedListName = newListName.trim();
+      if (trimmedListName && trimmedListName !== checklist.name) {
+        const updatedList = await sendApiRequest("PATCH", `/api/lists/${checklist.id}`, { name: trimmedListName });
+        checklist.name = updatedList.name;
+      }
+      renderTabs();
+      if (shouldFocusTab) {
+        focusActiveTab();
+      }
+    }
+
+    async function createList() {
+      // Ignore repeat presses while the server is still creating the previous list.
+      if (isCreatingList) {
+        return;
+      }
+      isCreatingList = true;
+      try {
+        const createdList = await sendApiRequest("POST", "/api/lists", { name: `List ${checklists.length + 1}` });
+        checklists.push(createdList);
+        localStorage.setItem(ACTIVE_LIST_STORAGE_KEY, createdList.id);
+        startRenaming(createdList.id);
+      } finally {
+        isCreatingList = false;
+      }
+    }
+
+    async function deleteActiveList() {
+      const activeList = getActiveList();
+      if (checklists.length <= 1) {
+        return;
+      }
+      const itemCountText = activeList.items.length === 1 ? "1 item" : `${activeList.items.length} items`;
+      if (!confirm(`Delete "${activeList.name}" and its ${itemCountText}?`)) {
+        return;
+      }
+      const deletedListIndex = checklists.indexOf(activeList);
+      await sendApiRequest("DELETE", `/api/lists/${activeList.id}`);
+      checklists = checklists.filter((checklist) => checklist.id !== activeList.id);
+      activateList(checklists[Math.min(deletedListIndex, checklists.length - 1)].id);
+      focusActiveTab();
+    }
+
+    async function toggleItemCompleted(checklist, checklistItem) {
+      const updatedItem = await sendApiRequest("PATCH", `/api/lists/${checklist.id}/items/${checklistItem.id}`, {
+        completed: !checklistItem.completed,
+      });
+      checklistItem.completed = updatedItem.completed;
+      renderItems();
+      checklistElement.querySelector(`[data-item-id="${checklistItem.id}"] input`)?.focus();
+    }
+
+    async function deleteItem(checklist, checklistItem) {
+      const wasFocusInsideList = checklistElement.contains(document.activeElement);
+      const deletedItemIndex = checklist.items.indexOf(checklistItem);
+      await sendApiRequest("DELETE", `/api/lists/${checklist.id}/items/${checklistItem.id}`);
+      checklist.items = checklist.items.filter((existingItem) => existingItem.id !== checklistItem.id);
+      renderItems();
+
+      // Keep focus in the list so keyboard users can continue from the same position.
+      if (wasFocusInsideList) {
+        const itemCheckboxes = getItemCheckboxes();
+        if (itemCheckboxes.length) {
+          itemCheckboxes[Math.min(deletedItemIndex, itemCheckboxes.length - 1)].focus();
+        } else {
+          newItemTextInput.focus();
+        }
+      }
+    }
+
+    async function loadChecklists() {
+      checklists = await sendApiRequest("GET", "/api/lists");
+      const storedActiveListId = localStorage.getItem(ACTIVE_LIST_STORAGE_KEY);
+      const storedListStillExists = checklists.some((checklist) => checklist.id === storedActiveListId);
+      activeListId = storedListStillExists ? storedActiveListId : checklists[0].id;
+      render();
+      newItemTextInput.focus();
+    }
+
+    newListButton.addEventListener("click", createList);
+    renameListButton.addEventListener("click", () => startRenaming(activeListId));
+    deleteListButton.addEventListener("click", deleteActiveList);
+
+    newItemForm.addEventListener("submit", async (submitEvent) => {
+      submitEvent.preventDefault();
+      const activeList = getActiveList();
+      const newItemText = newItemTextInput.value.trim();
+      if (!newItemText) {
+        return;
+      }
+      // Clear before the request so text typed while it is in flight is kept.
+      newItemTextInput.value = "";
+      const createdItem = await sendApiRequest("POST", `/api/lists/${activeList.id}/items`, { text: newItemText });
+      activeList.items.push(createdItem);
+      if (activeList.id === activeListId) {
+        renderItems();
+      }
+    });
+
+    document.addEventListener("keydown", (keyboardEvent) => {
+      const isModifierPressed = keyboardEvent.ctrlKey || keyboardEvent.metaKey;
+
+      // Ctrl+D (Cmd+D on macOS) deletes the most recently added item in the current list.
+      // preventDefault stops the browser from opening its bookmark dialog.
+      if (isModifierPressed && !keyboardEvent.shiftKey && !keyboardEvent.altKey && keyboardEvent.key.toLowerCase() === "d") {
+        keyboardEvent.preventDefault();
+        const activeList = getActiveList();
+        const lastAddedItem = activeList.items[activeList.items.length - 1];
+        if (lastAddedItem) {
+          deleteItem(activeList, lastAddedItem);
+        }
+        return;
+      }
+
+      if (isModifierPressed || keyboardEvent.altKey) {
+        return;
+      }
+
+      // Single-key shortcuts are ignored while typing so they don't interfere with text entry.
+      if (keyboardEvent.target.matches('input[type="text"]')) {
+        if (keyboardEvent.key === "Escape" && keyboardEvent.target === newItemTextInput) {
+          keyboardEvent.preventDefault();
+          focusFirstItemOrActiveTab();
+        }
+        return;
+      }
+
+      if (keyboardEvent.key === "n" || keyboardEvent.key === "/") {
+        keyboardEvent.preventDefault();
+        newItemTextInput.focus();
+      } else if (keyboardEvent.key === "[") {
+        keyboardEvent.preventDefault();
+        switchListByOffset(-1);
+      } else if (keyboardEvent.key === "]") {
+        keyboardEvent.preventDefault();
+        switchListByOffset(1);
+      } else if (keyboardEvent.key === "t") {
+        keyboardEvent.preventDefault();
+        createList();
+      } else if (keyboardEvent.key === "r" || keyboardEvent.key === "F2") {
+        keyboardEvent.preventDefault();
+        startRenaming(activeListId);
+      } else if (keyboardEvent.key === "?") {
+        keyboardEvent.preventDefault();
+        keyboardHelpElement.open = !keyboardHelpElement.open;
+      }
+    });
+
+    loadChecklists();
+  </script>
+</body>
+</html>
