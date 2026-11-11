@@ -2,3 +2,4 @@ node_modules/
 checklist-data.json
 test-results/
 playwright-report/
+.wrangler/
