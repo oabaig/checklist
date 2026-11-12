@@ -10,6 +10,7 @@ A simple keyboard-friendly checklist app with tabbed lists and sub-items.
 - Items that can be checked off and deleted, with a completed count per list
 - One level of sub-items under each item, with a `done/total` count on the parent
 - Every action is available from the keyboard (press `?` in the app for the full list)
+- Light and dark mode, following the system setting until you pick one with the toggle
 - Data is saved in the browser's `localStorage`, so nothing is sent to a server
 
 Because data lives in `localStorage`, it is tied to one browser and one address. Lists saved on
@@ -34,6 +35,7 @@ Single-key shortcuts are ignored while typing in a text box.
 | `T` | New list |
 | `R` or `F2` | Rename the current list (`Enter` saves, `Esc` cancels) |
 | `?` | Show or hide the shortcut help |
+| `Shift` + `L` | Switch between light and dark mode |
 
 Vim keys are also available:
 
