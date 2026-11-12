@@ -6,8 +6,13 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByRole("tab", { name: "Checklist" })).toBeVisible();
 });
 
+// Top-level item rows only; sub-items are nested inside them.
 function getItemRows(page) {
-  return page.locator("#checklist li");
+  return page.locator("#checklist > li");
+}
+
+function getSubItemRows(page, parentItemText) {
+  return getItemRows(page).filter({ hasText: parentItemText }).locator(".sub-items > li:not(.sub-item-input-row)");
 }
 
 async function addItem(page, itemText) {
@@ -22,7 +27,7 @@ test.describe("items", () => {
     await expect(page.locator("#progress-summary")).toHaveText("0 of 1 completed");
 
     await page.getByRole("checkbox", { name: "Buy milk" }).check();
-    await expect(page.locator("#checklist li.completed")).toHaveText(/Buy milk/);
+    await expect(page.locator("#checklist .item-row.completed")).toHaveText(/Buy milk/);
     await expect(page.locator("#progress-summary")).toHaveText("1 of 1 completed");
 
     await page.getByRole("button", { name: "Delete Buy milk" }).click();
@@ -288,6 +293,7 @@ test.describe("keyboard only", () => {
       page.getByPlaceholder("Add an item..."),
       page.getByRole("button", { name: "Add", exact: true }),
       page.getByRole("checkbox", { name: "Reachable" }),
+      page.getByRole("button", { name: "Add sub-item to Reachable" }),
       page.getByRole("button", { name: "Delete Reachable" }),
       page.getByText("Keyboard shortcuts"),
     ];
@@ -303,4 +309,122 @@ test("unreadable saved data falls back to an empty list", async ({ page }) => {
   await page.reload();
   await expect(page.getByRole("tab")).toHaveText(["Checklist"]);
   await expect(page.locator("#progress-summary")).toHaveText("No items yet.");
+});
+
+test.describe("sub-items", () => {
+  test("adds, completes, and deletes sub-items with the mouse, and they persist", async ({ page }) => {
+    await addItem(page, "Pack");
+    await page.getByRole("button", { name: "Add sub-item to Pack" }).click();
+    const subItemInput = page.getByRole("textbox", { name: "New sub-item for Pack" });
+    await expect(subItemInput).toBeFocused();
+    await subItemInput.fill("Socks");
+    await subItemInput.press("Enter");
+    await expect(subItemInput).toBeFocused();
+    await subItemInput.fill("Charger");
+    await subItemInput.press("Enter");
+    await expect(getSubItemRows(page, "Pack")).toHaveText([/Socks/, /Charger/]);
+    await expect(page.locator(".sub-item-progress")).toHaveText("0/2");
+
+    await page.getByRole("checkbox", { name: "Socks" }).check();
+    await expect(page.locator(".sub-item-progress")).toHaveText("1/2");
+    await expect(page.getByRole("checkbox", { name: "Pack" })).not.toBeChecked();
+    await expect(page.locator("#progress-summary")).toHaveText("0 of 1 completed");
+
+    await page.reload();
+    await expect(getSubItemRows(page, "Pack")).toHaveText([/Socks/, /Charger/]);
+    await expect(page.getByRole("checkbox", { name: "Socks" })).toBeChecked();
+
+    await page.getByRole("button", { name: "Delete Socks" }).click();
+    await expect(getSubItemRows(page, "Pack")).toHaveText([/Charger/]);
+    await expect(getItemRows(page)).toHaveCount(1);
+  });
+
+  test("clicking elsewhere closes the sub-item box and the click still works", async ({ page }) => {
+    await addItem(page, "First");
+    await addItem(page, "Second");
+    await page.getByRole("button", { name: "Add sub-item to First" }).click();
+    await expect(page.getByRole("textbox", { name: "New sub-item for First" })).toBeFocused();
+
+    await page.getByRole("checkbox", { name: "Second" }).click();
+    await expect(page.getByRole("textbox", { name: "New sub-item for First" })).toHaveCount(0);
+    await expect(page.getByRole("checkbox", { name: "Second" })).toBeChecked();
+  });
+
+  test("keyboard: S opens the box, Esc closes it, arrows move through sub-items", async ({ page }) => {
+    await addItem(page, "Parent");
+    await addItem(page, "After");
+    await page.getByPlaceholder("Add an item...").press("Escape");
+    await expect(page.getByRole("checkbox", { name: "Parent" })).toBeFocused();
+
+    await page.keyboard.press("s");
+    const subItemInput = page.getByRole("textbox", { name: "New sub-item for Parent" });
+    await expect(subItemInput).toBeFocused();
+    await page.keyboard.type("Child one");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("Child two");
+    await page.keyboard.press("Enter");
+    // Backspace and single-letter shortcuts must not act on the parent row while typing.
+    await page.keyboard.type("sx");
+    await page.keyboard.press("Backspace");
+    await expect(subItemInput).toHaveValue("s");
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("checkbox", { name: "Parent" })).toBeFocused();
+    await expect(subItemInput).toHaveCount(0);
+    await expect(getSubItemRows(page, "Parent")).toHaveText([/Child one/, /Child two/]);
+
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByRole("checkbox", { name: "Child one" })).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByRole("checkbox", { name: "Child two" })).toBeFocused();
+    await page.keyboard.press("Space");
+    await expect(page.getByRole("checkbox", { name: "Child two" })).toBeChecked();
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByRole("checkbox", { name: "After" })).toBeFocused();
+    await page.keyboard.press("ArrowUp");
+    await expect(page.getByRole("checkbox", { name: "Child two" })).toBeFocused();
+
+    // S on a sub-item does nothing because sub-items cannot have their own sub-items.
+    await page.keyboard.press("s");
+    await expect(page.getByRole("textbox", { name: /New sub-item/ })).toHaveCount(0);
+
+    await page.keyboard.press("ArrowUp");
+    await page.keyboard.press("Delete");
+    await expect(getSubItemRows(page, "Parent")).toHaveText([/Child two/]);
+    await expect(page.getByRole("checkbox", { name: "Child two" })).toBeFocused();
+    await expect(getItemRows(page)).toHaveCount(2);
+  });
+
+  test("Enter on an empty sub-item box closes it", async ({ page }) => {
+    await addItem(page, "Parent");
+    await page.getByRole("button", { name: "Add sub-item to Parent" }).click();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("textbox", { name: "New sub-item for Parent" })).toHaveCount(0);
+    await expect(page.getByRole("checkbox", { name: "Parent" })).toBeFocused();
+  });
+
+  test("deleting a parent removes its sub-items, and Ctrl+D removes the last top-level item", async ({ page }) => {
+    await addItem(page, "Keep");
+    await addItem(page, "Remove");
+    await page.getByRole("button", { name: "Add sub-item to Remove" }).click();
+    await page.keyboard.type("Nested");
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Escape");
+
+    await page.keyboard.press("Control+D");
+    await expect(getItemRows(page)).toHaveText([/Keep/]);
+    await expect(page.getByRole("checkbox", { name: "Nested" })).toHaveCount(0);
+  });
+
+  test("items saved without sub-items still load", async ({ page }) => {
+    await page.evaluate(() => {
+      localStorage.setItem("checklists", JSON.stringify([
+        { id: "list-1", name: "Saved", items: [{ id: "item-1", text: "Old item", completed: false }] },
+      ]));
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "Add sub-item to Old item" }).click();
+    await page.keyboard.type("New child");
+    await page.keyboard.press("Enter");
+    await expect(getSubItemRows(page, "Old item")).toHaveText([/New child/]);
+  });
 });

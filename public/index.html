@@ -115,23 +115,44 @@
       padding: 0;
       margin: 0;
     }
-    li {
+    #checklist > li {
+      border-bottom: 1px solid #e4e4e7;
+    }
+    .item-row {
       display: flex;
       align-items: center;
       gap: 8px;
       padding: 8px 0;
-      border-bottom: 1px solid #e4e4e7;
     }
-    li label {
+    .item-row label {
       flex: 1;
       display: flex;
       align-items: center;
       gap: 8px;
       cursor: pointer;
     }
-    li.completed span {
+    .item-row.completed label span {
       text-decoration: line-through;
       color: #a1a1aa;
+    }
+    .sub-item-progress {
+      color: #71717a;
+      font-size: 0.85rem;
+    }
+    .sub-items {
+      margin-left: 28px;
+    }
+    .sub-items .item-row {
+      padding: 4px 0;
+    }
+    .sub-item-input-row {
+      padding: 4px 0 8px;
+    }
+    .sub-item-input-row input {
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 0.95rem;
+      padding: 6px 8px;
     }
     #progress-summary,
     #keyboard-help {
@@ -183,9 +204,10 @@
       <table>
         <tr><td><kbd>N</kbd> or <kbd>/</kbd></td><td>Go to the "Add an item" box</td></tr>
         <tr><td><kbd>Esc</kbd></td><td>Leave the text box</td></tr>
-        <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Move between items</td></tr>
+        <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Move between items and sub-items</td></tr>
         <tr><td><kbd>Space</kbd> or <kbd>Enter</kbd></td><td>Check or uncheck the focused item</td></tr>
         <tr><td><kbd>Delete</kbd> or <kbd>Backspace</kbd></td><td>Delete the focused item</td></tr>
+        <tr><td><kbd>S</kbd></td><td>Add sub-items to the focused item (<kbd>Enter</kbd> adds, <kbd>Esc</kbd> closes)</td></tr>
         <tr><td><kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>D</kbd></td><td>Delete the last added item in this list</td></tr>
         <tr><td><kbd>[</kbd> / <kbd>]</kbd></td><td>Previous / next list</td></tr>
         <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>Previous / next list (when a tab is focused)</td></tr>
@@ -215,6 +237,16 @@
     let checklists = [];
     let activeListId = null;
     let renamingListId = null;
+    let addingSubItemToItemId = null;
+    let isRenderingItems = false;
+    let isPointerPressed = false;
+
+    document.addEventListener("pointerdown", () => {
+      isPointerPressed = true;
+    }, { capture: true });
+    document.addEventListener("pointerup", () => {
+      isPointerPressed = false;
+    }, { capture: true });
 
     function getActiveList() {
       return checklists.find((checklist) => checklist.id === activeListId);
@@ -233,6 +265,12 @@
       try {
         const storedChecklists = JSON.parse(localStorage.getItem(CHECKLISTS_STORAGE_KEY));
         if (Array.isArray(storedChecklists) && storedChecklists.length > 0) {
+          // Items saved before sub-items existed have no subItems array.
+          for (const storedChecklist of storedChecklists) {
+            for (const storedItem of storedChecklist.items) {
+              storedItem.subItems ??= [];
+            }
+          }
           return storedChecklists;
         }
       } catch (parseError) {
@@ -287,40 +325,137 @@
       }
     }
 
-    function renderItems() {
-      const activeList = getActiveList();
-      checklistElement.innerHTML = "";
-      for (const checklistItem of activeList.items) {
-        const listItemElement = document.createElement("li");
-        listItemElement.dataset.itemId = checklistItem.id;
-        if (checklistItem.completed) {
-          listItemElement.classList.add("completed");
+    // Builds the row for a top-level item or a sub-item. containingEntries is the array the entry lives in.
+    function createEntryElement(entry, containingEntries, isSubItem) {
+      const listItemElement = document.createElement("li");
+      listItemElement.dataset.itemId = entry.id;
+
+      const itemRowElement = document.createElement("div");
+      itemRowElement.className = "item-row";
+      if (entry.completed) {
+        itemRowElement.classList.add("completed");
+      }
+
+      const labelElement = document.createElement("label");
+      const checkboxElement = document.createElement("input");
+      checkboxElement.type = "checkbox";
+      checkboxElement.checked = entry.completed;
+      checkboxElement.addEventListener("change", () => toggleEntryCompleted(entry));
+
+      const entryTextElement = document.createElement("span");
+      entryTextElement.textContent = entry.text;
+
+      labelElement.append(checkboxElement, entryTextElement);
+      itemRowElement.append(labelElement);
+
+      if (!isSubItem) {
+        if (entry.subItems.length) {
+          const completedSubItemCount = entry.subItems.filter((subItem) => subItem.completed).length;
+          const subItemProgressElement = document.createElement("span");
+          subItemProgressElement.className = "sub-item-progress";
+          subItemProgressElement.textContent = `${completedSubItemCount}/${entry.subItems.length}`;
+          itemRowElement.append(subItemProgressElement);
         }
 
-        const labelElement = document.createElement("label");
-        const checkboxElement = document.createElement("input");
-        checkboxElement.type = "checkbox";
-        checkboxElement.checked = checklistItem.completed;
-        checkboxElement.addEventListener("change", () => toggleItemCompleted(activeList, checklistItem));
+        const addSubItemButtonElement = document.createElement("button");
+        addSubItemButtonElement.type = "button";
+        addSubItemButtonElement.className = "secondary";
+        addSubItemButtonElement.textContent = "+ Sub-item";
+        addSubItemButtonElement.setAttribute("aria-label", `Add sub-item to ${entry.text}`);
+        addSubItemButtonElement.addEventListener("click", () => startAddingSubItem(entry));
+        itemRowElement.append(addSubItemButtonElement);
+      }
 
-        const itemTextElement = document.createElement("span");
-        itemTextElement.textContent = checklistItem.text;
+      const deleteButtonElement = document.createElement("button");
+      deleteButtonElement.type = "button";
+      deleteButtonElement.className = "danger";
+      deleteButtonElement.textContent = "Delete";
+      deleteButtonElement.setAttribute("aria-label", `Delete ${entry.text}`);
+      deleteButtonElement.addEventListener("click", () => deleteEntry(containingEntries, entry));
+      itemRowElement.append(deleteButtonElement);
 
-        labelElement.append(checkboxElement, itemTextElement);
+      listItemElement.append(itemRowElement);
 
-        const deleteButtonElement = document.createElement("button");
-        deleteButtonElement.type = "button";
-        deleteButtonElement.className = "danger";
-        deleteButtonElement.textContent = "Delete";
-        deleteButtonElement.setAttribute("aria-label", `Delete ${checklistItem.text}`);
-        deleteButtonElement.addEventListener("click", () => deleteItem(activeList, checklistItem));
+      listItemElement.addEventListener("keydown", (keyboardEvent) => {
+        // Sub-item rows are nested inside this row, so ignore keys that belong to a nested row.
+        if (keyboardEvent.target.closest("li") !== listItemElement) {
+          return;
+        }
+        handleEntryKeydown(keyboardEvent, containingEntries, entry, isSubItem);
+      });
 
-        listItemElement.addEventListener("keydown", (keyboardEvent) => {
-          handleItemKeydown(keyboardEvent, activeList, checklistItem);
-        });
+      if (!isSubItem && (entry.subItems.length || addingSubItemToItemId === entry.id)) {
+        const subItemsElement = document.createElement("ul");
+        subItemsElement.className = "sub-items";
+        for (const subItem of entry.subItems) {
+          subItemsElement.append(createEntryElement(subItem, entry.subItems, true));
+        }
+        if (addingSubItemToItemId === entry.id) {
+          subItemsElement.append(createSubItemInputElement(entry));
+        }
+        listItemElement.append(subItemsElement);
+      }
 
-        listItemElement.append(labelElement, deleteButtonElement);
-        checklistElement.append(listItemElement);
+      return listItemElement;
+    }
+
+    function createSubItemInputElement(parentItem) {
+      const inputRowElement = document.createElement("li");
+      inputRowElement.className = "sub-item-input-row";
+      const subItemInputElement = document.createElement("input");
+      subItemInputElement.type = "text";
+      subItemInputElement.className = "sub-item-input";
+      subItemInputElement.placeholder = "Add a sub-item...";
+      subItemInputElement.autocomplete = "off";
+      subItemInputElement.setAttribute("aria-label", `New sub-item for ${parentItem.text}`);
+
+      subItemInputElement.addEventListener("keydown", (keyboardEvent) => {
+        if (keyboardEvent.key === "Enter") {
+          keyboardEvent.preventDefault();
+          const subItemText = subItemInputElement.value.trim();
+          if (!subItemText) {
+            stopAddingSubItem(parentItem);
+            return;
+          }
+          parentItem.subItems.push({ id: createId(), text: subItemText, completed: false });
+          saveChecklists();
+          renderItems();
+          focusSubItemInput();
+        } else if (keyboardEvent.key === "Escape") {
+          keyboardEvent.preventDefault();
+          stopAddingSubItem(parentItem);
+        }
+      });
+
+      // Close the box when focus moves elsewhere. Blur also fires when a re-render removes the box, which is ignored.
+      subItemInputElement.addEventListener("blur", () => {
+        if (isRenderingItems || addingSubItemToItemId !== parentItem.id) {
+          return;
+        }
+        addingSubItemToItemId = null;
+        // A mouse press moves focus before the click lands. Removing the box right away would shift the
+        // rows below it, so the click would miss its target; wait until the button is released instead.
+        if (isPointerPressed) {
+          window.addEventListener("pointerup", () => setTimeout(() => inputRowElement.remove()), { once: true });
+        } else {
+          inputRowElement.remove();
+        }
+      });
+
+      inputRowElement.append(subItemInputElement);
+      return inputRowElement;
+    }
+
+    function renderItems() {
+      const activeList = getActiveList();
+      isRenderingItems = true;
+      try {
+        checklistElement.innerHTML = "";
+        for (const checklistItem of activeList.items) {
+          checklistElement.append(createEntryElement(checklistItem, activeList.items, false));
+        }
+      } finally {
+        isRenderingItems = false;
       }
 
       const completedItemCount = activeList.items.filter((checklistItem) => checklistItem.completed).length;
@@ -336,8 +471,17 @@
       deleteListButton.disabled = checklists.length <= 1;
     }
 
+    // All item and sub-item checkboxes in the order they appear on screen.
     function getItemCheckboxes() {
       return [...checklistElement.querySelectorAll('input[type="checkbox"]')];
+    }
+
+    function getEntryCheckbox(entryId) {
+      return checklistElement.querySelector(`[data-item-id="${entryId}"] > .item-row input[type="checkbox"]`);
+    }
+
+    function focusSubItemInput() {
+      checklistElement.querySelector(".sub-item-input")?.focus();
     }
 
     function focusActiveTab() {
@@ -355,6 +499,7 @@
 
     function activateList(listId) {
       activeListId = listId;
+      addingSubItemToItemId = null;
       localStorage.setItem(ACTIVE_LIST_STORAGE_KEY, listId);
       render();
     }
@@ -384,9 +529,10 @@
       }
     }
 
-    function handleItemKeydown(keyboardEvent, checklist, checklistItem) {
+    function handleEntryKeydown(keyboardEvent, containingEntries, entry, isSubItem) {
       const itemCheckboxes = getItemCheckboxes();
-      const currentItemIndex = checklist.items.indexOf(checklistItem);
+      const currentItemIndex = itemCheckboxes.indexOf(getEntryCheckbox(entry.id));
+      const isModifierPressed = keyboardEvent.ctrlKey || keyboardEvent.metaKey || keyboardEvent.altKey;
 
       if (keyboardEvent.key === "ArrowDown") {
         keyboardEvent.preventDefault();
@@ -402,11 +548,26 @@
         itemCheckboxes[itemCheckboxes.length - 1].focus();
       } else if (keyboardEvent.key === "Delete" || keyboardEvent.key === "Backspace") {
         keyboardEvent.preventDefault();
-        deleteItem(checklist, checklistItem);
+        deleteEntry(containingEntries, entry);
       } else if (keyboardEvent.key === "Enter" && keyboardEvent.target.type === "checkbox") {
         keyboardEvent.preventDefault();
-        toggleItemCompleted(checklist, checklistItem);
+        toggleEntryCompleted(entry);
+      } else if (keyboardEvent.key === "s" && !isSubItem && !isModifierPressed) {
+        keyboardEvent.preventDefault();
+        startAddingSubItem(entry);
       }
+    }
+
+    function startAddingSubItem(parentItem) {
+      addingSubItemToItemId = parentItem.id;
+      renderItems();
+      focusSubItemInput();
+    }
+
+    function stopAddingSubItem(parentItem) {
+      addingSubItemToItemId = null;
+      renderItems();
+      getEntryCheckbox(parentItem.id)?.focus();
     }
 
     function startRenaming(listId) {
@@ -465,17 +626,20 @@
       focusActiveTab();
     }
 
-    function toggleItemCompleted(checklist, checklistItem) {
-      checklistItem.completed = !checklistItem.completed;
+    function toggleEntryCompleted(entry) {
+      entry.completed = !entry.completed;
       saveChecklists();
       renderItems();
-      checklistElement.querySelector(`[data-item-id="${checklistItem.id}"] input`)?.focus();
+      getEntryCheckbox(entry.id)?.focus();
     }
 
-    function deleteItem(checklist, checklistItem) {
+    function deleteEntry(containingEntries, entry) {
       const wasFocusInsideList = checklistElement.contains(document.activeElement);
-      const deletedItemIndex = checklist.items.indexOf(checklistItem);
-      checklist.items = checklist.items.filter((existingItem) => existingItem.id !== checklistItem.id);
+      const deletedItemIndex = getItemCheckboxes().indexOf(getEntryCheckbox(entry.id));
+      containingEntries.splice(containingEntries.indexOf(entry), 1);
+      if (addingSubItemToItemId === entry.id) {
+        addingSubItemToItemId = null;
+      }
       saveChecklists();
       renderItems();
 
@@ -510,7 +674,7 @@
       if (!newItemText) {
         return;
       }
-      activeList.items.push({ id: createId(), text: newItemText, completed: false });
+      activeList.items.push({ id: createId(), text: newItemText, completed: false, subItems: [] });
       saveChecklists();
       newItemTextInput.value = "";
       renderItems();
@@ -526,7 +690,7 @@
         const activeList = getActiveList();
         const lastAddedItem = activeList.items[activeList.items.length - 1];
         if (lastAddedItem) {
-          deleteItem(activeList, lastAddedItem);
+          deleteEntry(activeList.items, lastAddedItem);
         }
         return;
       }
