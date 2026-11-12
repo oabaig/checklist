@@ -35,6 +35,16 @@ Single-key shortcuts are ignored while typing in a text box.
 | `R` or `F2` | Rename the current list (`Enter` saves, `Esc` cancels) |
 | `?` | Show or hide the shortcut help |
 
+Vim keys are also available:
+
+| Key | Action |
+| --- | --- |
+| `j` / `k` | Move down / up through items and sub-items |
+| `gg` / `G` | First / last item |
+| `h` / `l` | Previous / next list |
+| `x` or `dd` | Delete the focused item |
+| `i` or `o` | Go to the "Add an item" box |
+
 ## Running locally
 
 Requires Node.js 18 or later. The app has no runtime dependencies.
