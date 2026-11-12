@@ -428,3 +428,71 @@ test.describe("sub-items", () => {
     await expect(getSubItemRows(page, "Old item")).toHaveText([/New child/]);
   });
 });
+
+test.describe("vim keys", () => {
+  test.beforeEach(async ({ page }) => {
+    await addItem(page, "One");
+    await page.getByRole("button", { name: "Add sub-item to One" }).click();
+    await page.keyboard.type("One child");
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Escape");
+    await addItem(page, "Two");
+    await addItem(page, "Three");
+    await page.getByPlaceholder("Add an item...").press("Escape");
+    await expect(page.getByRole("checkbox", { name: "One", exact: true })).toBeFocused();
+  });
+
+  test("j, k, gg, and G move through items and sub-items", async ({ page }) => {
+    await page.keyboard.press("j");
+    await expect(page.getByRole("checkbox", { name: "One child" })).toBeFocused();
+    await page.keyboard.press("j");
+    await expect(page.getByRole("checkbox", { name: "Two" })).toBeFocused();
+    await page.keyboard.press("k");
+    await expect(page.getByRole("checkbox", { name: "One child" })).toBeFocused();
+    await page.keyboard.press("G");
+    await expect(page.getByRole("checkbox", { name: "Three" })).toBeFocused();
+    await page.keyboard.press("j");
+    await expect(page.getByRole("checkbox", { name: "Three" })).toBeFocused();
+    await page.keyboard.press("g");
+    await page.keyboard.press("g");
+    await expect(page.getByRole("checkbox", { name: "One", exact: true })).toBeFocused();
+  });
+
+  test("j from a tab jumps to the first item", async ({ page }) => {
+    await page.getByRole("tab", { name: "Checklist" }).focus();
+    await page.keyboard.press("j");
+    await expect(page.getByRole("checkbox", { name: "One", exact: true })).toBeFocused();
+  });
+
+  test("x and dd delete the focused item; a single d does nothing", async ({ page }) => {
+    await page.keyboard.press("j");
+    await page.keyboard.press("x");
+    await expect(page.getByRole("checkbox", { name: "One child" })).toHaveCount(0);
+    await expect(getItemRows(page)).toHaveCount(3);
+
+    await page.keyboard.press("G");
+    await page.keyboard.press("d");
+    await expect(getItemRows(page)).toHaveCount(3);
+    await page.keyboard.press("d");
+    await expect(getItemRows(page)).toHaveText([/One/, /Two/]);
+    await expect(page.getByRole("checkbox", { name: "Two" })).toBeFocused();
+  });
+
+  test("h and l switch lists, i and o go to the add box", async ({ page }) => {
+    await page.keyboard.press("t");
+    await expect(page.getByRole("textbox", { name: "List name" })).toBeFocused();
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("h");
+    await expect(page.getByRole("tab", { name: "Checklist" })).toBeFocused();
+    await page.keyboard.press("l");
+    await expect(page.getByRole("tab", { name: "List 2" })).toBeFocused();
+
+    await page.keyboard.press("i");
+    await expect(page.getByPlaceholder("Add an item...")).toBeFocused();
+    await page.keyboard.type("hjklxdgio");
+    await expect(page.getByPlaceholder("Add an item...")).toHaveValue("hjklxdgio");
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("o");
+    await expect(page.getByPlaceholder("Add an item...")).toBeFocused();
+  });
+});

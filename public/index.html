@@ -215,6 +215,14 @@
         <tr><td><kbd>R</kbd> or <kbd>F2</kbd></td><td>Rename this list (<kbd>Enter</kbd> saves, <kbd>Esc</kbd> cancels)</td></tr>
         <tr><td><kbd>?</kbd></td><td>Show or hide this help</td></tr>
       </table>
+      <p>Vim keys</p>
+      <table>
+        <tr><td><kbd>j</kbd> / <kbd>k</kbd></td><td>Move down / up through items and sub-items</td></tr>
+        <tr><td><kbd>g</kbd><kbd>g</kbd> / <kbd>G</kbd></td><td>First / last item</td></tr>
+        <tr><td><kbd>h</kbd> / <kbd>l</kbd></td><td>Previous / next list</td></tr>
+        <tr><td><kbd>x</kbd> or <kbd>d</kbd><kbd>d</kbd></td><td>Delete the focused item</td></tr>
+        <tr><td><kbd>i</kbd> or <kbd>o</kbd></td><td>Go to the "Add an item" box</td></tr>
+      </table>
     </details>
   </main>
 
@@ -240,6 +248,8 @@
     let addingSubItemToItemId = null;
     let isRenderingItems = false;
     let isPointerPressed = false;
+    let pendingVimKey = null;
+    let pendingVimKeyTime = 0;
 
     document.addEventListener("pointerdown", () => {
       isPointerPressed = true;
@@ -488,6 +498,46 @@
       document.getElementById(`tab-${activeListId}`)?.focus();
     }
 
+    // Moves focus through item and sub-item checkboxes. From outside the list, moving down
+    // starts at the first item and moving up starts at the last.
+    function moveItemFocusByOffset(offset) {
+      const itemCheckboxes = getItemCheckboxes();
+      if (!itemCheckboxes.length) {
+        return;
+      }
+      const focusedEntryCheckbox = getFocusedEntryCheckbox();
+      if (!focusedEntryCheckbox) {
+        itemCheckboxes[offset > 0 ? 0 : itemCheckboxes.length - 1].focus();
+        return;
+      }
+      const nextCheckboxIndex = itemCheckboxes.indexOf(focusedEntryCheckbox) + offset;
+      itemCheckboxes[Math.min(Math.max(nextCheckboxIndex, 0), itemCheckboxes.length - 1)].focus();
+    }
+
+    function getFocusedEntryCheckbox() {
+      const focusedEntryElement = document.activeElement?.closest("#checklist li[data-item-id]");
+      return focusedEntryElement ? getEntryCheckbox(focusedEntryElement.dataset.itemId) : null;
+    }
+
+    function deleteFocusedEntry() {
+      const focusedEntryElement = document.activeElement?.closest("#checklist li[data-item-id]");
+      if (!focusedEntryElement) {
+        return;
+      }
+      const focusedEntryId = focusedEntryElement.dataset.itemId;
+      for (const checklistItem of getActiveList().items) {
+        if (checklistItem.id === focusedEntryId) {
+          deleteEntry(getActiveList().items, checklistItem);
+          return;
+        }
+        const matchingSubItem = checklistItem.subItems.find((subItem) => subItem.id === focusedEntryId);
+        if (matchingSubItem) {
+          deleteEntry(checklistItem.subItems, matchingSubItem);
+          return;
+        }
+      }
+    }
+
     function focusFirstItemOrActiveTab() {
       const firstItemCheckbox = getItemCheckboxes()[0];
       if (firstItemCheckbox) {
@@ -708,7 +758,39 @@
         return;
       }
 
-      if (keyboardEvent.key === "n" || keyboardEvent.key === "/") {
+      // Vim-style two-key commands (gg, dd) must be typed within a second of each other.
+      const previousVimKey = Date.now() - pendingVimKeyTime < 1000 ? pendingVimKey : null;
+      pendingVimKey = null;
+
+      if (keyboardEvent.key === "g" || keyboardEvent.key === "d") {
+        keyboardEvent.preventDefault();
+        if (previousVimKey !== keyboardEvent.key) {
+          pendingVimKey = keyboardEvent.key;
+          pendingVimKeyTime = Date.now();
+        } else if (keyboardEvent.key === "g") {
+          getItemCheckboxes()[0]?.focus();
+        } else {
+          deleteFocusedEntry();
+        }
+      } else if (keyboardEvent.key === "j") {
+        keyboardEvent.preventDefault();
+        moveItemFocusByOffset(1);
+      } else if (keyboardEvent.key === "k") {
+        keyboardEvent.preventDefault();
+        moveItemFocusByOffset(-1);
+      } else if (keyboardEvent.key === "G") {
+        keyboardEvent.preventDefault();
+        getItemCheckboxes().at(-1)?.focus();
+      } else if (keyboardEvent.key === "h") {
+        keyboardEvent.preventDefault();
+        switchListByOffset(-1);
+      } else if (keyboardEvent.key === "l") {
+        keyboardEvent.preventDefault();
+        switchListByOffset(1);
+      } else if (keyboardEvent.key === "x") {
+        keyboardEvent.preventDefault();
+        deleteFocusedEntry();
+      } else if (keyboardEvent.key === "n" || keyboardEvent.key === "/" || keyboardEvent.key === "i" || keyboardEvent.key === "o") {
         keyboardEvent.preventDefault();
         newItemTextInput.focus();
       } else if (keyboardEvent.key === "[") {
