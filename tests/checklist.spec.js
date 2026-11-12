@@ -496,3 +496,58 @@ test.describe("vim keys", () => {
     await expect(page.getByPlaceholder("Add an item...")).toBeFocused();
   });
 });
+
+test.describe("dark mode", () => {
+  function getPageBackgroundColor(page) {
+    return page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  }
+
+  test("follows the system setting by default", async ({ browser }) => {
+    for (const [colorScheme, expectedTheme, expectedButtonText] of [["dark", "dark", "Light mode"], ["light", "light", "Dark mode"]]) {
+      const browserContext = await browser.newContext({ colorScheme });
+      const page = await browserContext.newPage();
+      await page.goto("/");
+      await expect(page.locator("html")).toHaveAttribute("data-theme", expectedTheme);
+      await expect(page.locator("#theme-toggle-button")).toHaveText(expectedButtonText);
+      await browserContext.close();
+    }
+  });
+
+  test("toggle switches colors, is saved, and overrides the system setting", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.reload();
+    const lightBackgroundColor = await getPageBackgroundColor(page);
+
+    await page.getByRole("button", { name: "Dark mode" }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    expect(await getPageBackgroundColor(page)).not.toBe(lightBackgroundColor);
+
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await page.emulateMedia({ colorScheme: "light" });
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  });
+
+  test("changes to the system setting apply live until a theme is picked", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.reload();
+    await page.emulateMedia({ colorScheme: "dark" });
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await page.emulateMedia({ colorScheme: "light" });
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  });
+
+  test("Shift+L toggles the theme, but not while typing", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.reload();
+    await page.getByPlaceholder("Add an item...").press("Escape");
+    await page.keyboard.press("Shift+L");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await page.keyboard.press("Shift+L");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+
+    await page.getByPlaceholder("Add an item...").press("Shift+L");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await expect(page.getByPlaceholder("Add an item...")).toHaveValue("L");
+  });
+});

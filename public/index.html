@@ -4,34 +4,75 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Checklists</title>
+  <script>
+    // Runs before the page is drawn so the saved or system theme applies without briefly showing the other one.
+    document.documentElement.dataset.theme = localStorage.getItem("theme")
+      ?? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  </script>
   <style>
+    :root {
+      color-scheme: light;
+      --color-page-background: #f4f4f5;
+      --color-surface: #fff;
+      --color-text: #18181b;
+      --color-text-muted: #71717a;
+      --color-text-muted-strong: #52525b;
+      --color-text-disabled: #a1a1aa;
+      --color-border: #d4d4d8;
+      --color-divider: #e4e4e7;
+      --color-accent: #2563eb;
+      --color-accent-button: #2563eb;
+      --color-danger: #dc2626;
+      --color-shadow: rgba(0, 0, 0, 0.1);
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --color-page-background: #09090b;
+      --color-surface: #18181b;
+      --color-text: #f4f4f5;
+      --color-text-muted: #a1a1aa;
+      --color-text-muted-strong: #d4d4d8;
+      --color-text-disabled: #71717a;
+      --color-border: #3f3f46;
+      --color-divider: #27272a;
+      --color-accent: #60a5fa;
+      --color-accent-button: #2563eb;
+      --color-danger: #f87171;
+      --color-shadow: rgba(0, 0, 0, 0.5);
+    }
     body {
       font-family: system-ui, sans-serif;
-      background: #f4f4f5;
-      color: #18181b;
+      background: var(--color-page-background);
+      color: var(--color-text);
       margin: 0;
       padding: 40px 16px;
     }
     main {
       max-width: 560px;
       margin: 0 auto;
-      background: #fff;
+      background: var(--color-surface);
       border-radius: 8px;
       padding: 24px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 1px 3px var(--color-shadow);
+    }
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
     }
     h1 {
-      margin-top: 0;
+      margin: 0;
     }
     :focus-visible {
-      outline: 2px solid #2563eb;
+      outline: 2px solid var(--color-accent);
       outline-offset: 2px;
     }
     .tab-bar {
       display: flex;
       align-items: flex-end;
       gap: 8px;
-      border-bottom: 1px solid #d4d4d8;
+      border-bottom: 1px solid var(--color-border);
       margin-bottom: 16px;
     }
     [role="tablist"] {
@@ -47,20 +88,20 @@
       border-bottom: none;
       border-radius: 6px 6px 0 0;
       background: transparent;
-      color: #52525b;
+      color: var(--color-text-muted-strong);
       cursor: pointer;
     }
     [role="tab"][aria-selected="true"] {
-      background: #fff;
-      border-color: #d4d4d8;
-      color: #18181b;
+      background: var(--color-surface);
+      border-color: var(--color-border);
+      color: var(--color-text);
       font-weight: 600;
       margin-bottom: -1px;
     }
     .rename-input {
       padding: 6px 8px;
       font-size: 0.95rem;
-      border: 1px solid #2563eb;
+      border: 1px solid var(--color-accent);
       border-radius: 4px;
       margin-bottom: 4px;
     }
@@ -73,7 +114,7 @@
       flex: 1;
       padding: 8px;
       font-size: 1rem;
-      border: 1px solid #d4d4d8;
+      border: 1px solid var(--color-border);
       border-radius: 4px;
     }
     button {
@@ -81,24 +122,24 @@
       font-size: 1rem;
       border: none;
       border-radius: 4px;
-      background: #2563eb;
+      background: var(--color-accent-button);
       color: #fff;
       cursor: pointer;
     }
     button.secondary {
       background: transparent;
-      color: #2563eb;
+      color: var(--color-accent);
       font-size: 0.9rem;
       padding: 4px 8px;
     }
     button.danger {
       background: transparent;
-      color: #dc2626;
+      color: var(--color-danger);
       font-size: 0.9rem;
       padding: 4px 8px;
     }
     button:disabled {
-      color: #a1a1aa;
+      color: var(--color-text-disabled);
       cursor: not-allowed;
     }
     #new-list-button {
@@ -116,7 +157,7 @@
       margin: 0;
     }
     #checklist > li {
-      border-bottom: 1px solid #e4e4e7;
+      border-bottom: 1px solid var(--color-divider);
     }
     .item-row {
       display: flex;
@@ -133,10 +174,10 @@
     }
     .item-row.completed label span {
       text-decoration: line-through;
-      color: #a1a1aa;
+      color: var(--color-text-disabled);
     }
     .sub-item-progress {
-      color: #71717a;
+      color: var(--color-text-muted);
       font-size: 0.85rem;
     }
     .sub-items {
@@ -157,7 +198,7 @@
     #progress-summary,
     #keyboard-help {
       margin-top: 16px;
-      color: #71717a;
+      color: var(--color-text-muted);
       font-size: 0.9rem;
     }
     #keyboard-help table {
@@ -171,8 +212,8 @@
     kbd {
       font-family: ui-monospace, monospace;
       font-size: 0.85em;
-      background: #f4f4f5;
-      border: 1px solid #d4d4d8;
+      background: var(--color-page-background);
+      border: 1px solid var(--color-border);
       border-radius: 3px;
       padding: 0 4px;
     }
@@ -180,7 +221,10 @@
 </head>
 <body>
   <main>
-    <h1>Checklists</h1>
+    <header class="page-header">
+      <h1>Checklists</h1>
+      <button type="button" id="theme-toggle-button" class="secondary"></button>
+    </header>
     <div class="tab-bar">
       <div role="tablist" id="list-tabs" aria-label="Checklists"></div>
       <button type="button" id="new-list-button" class="secondary">+ New list</button>
@@ -214,6 +258,7 @@
         <tr><td><kbd>T</kbd></td><td>New list</td></tr>
         <tr><td><kbd>R</kbd> or <kbd>F2</kbd></td><td>Rename this list (<kbd>Enter</kbd> saves, <kbd>Esc</kbd> cancels)</td></tr>
         <tr><td><kbd>?</kbd></td><td>Show or hide this help</td></tr>
+        <tr><td><kbd>Shift</kbd> + <kbd>L</kbd></td><td>Switch between light and dark mode</td></tr>
       </table>
       <p>Vim keys</p>
       <table>
@@ -241,6 +286,29 @@
     const checklistElement = document.getElementById("checklist");
     const progressSummaryElement = document.getElementById("progress-summary");
     const keyboardHelpElement = document.getElementById("keyboard-help");
+    const themeToggleButton = document.getElementById("theme-toggle-button");
+    const THEME_STORAGE_KEY = "theme";
+    const systemDarkModeQuery = matchMedia("(prefers-color-scheme: dark)");
+
+    function applyTheme(themeName) {
+      document.documentElement.dataset.theme = themeName;
+      themeToggleButton.textContent = themeName === "dark" ? "Light mode" : "Dark mode";
+    }
+
+    function toggleTheme() {
+      const nextThemeName = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      localStorage.setItem(THEME_STORAGE_KEY, nextThemeName);
+      applyTheme(nextThemeName);
+    }
+
+    // Follow the system setting until the user picks a theme with the toggle.
+    systemDarkModeQuery.addEventListener("change", () => {
+      if (!localStorage.getItem(THEME_STORAGE_KEY)) {
+        applyTheme(systemDarkModeQuery.matches ? "dark" : "light");
+      }
+    });
+    themeToggleButton.addEventListener("click", toggleTheme);
+    applyTheme(document.documentElement.dataset.theme);
 
     let checklists = [];
     let activeListId = null;
@@ -808,6 +876,9 @@
       } else if (keyboardEvent.key === "?") {
         keyboardEvent.preventDefault();
         keyboardHelpElement.open = !keyboardHelpElement.open;
+      } else if (keyboardEvent.key === "L") {
+        keyboardEvent.preventDefault();
+        toggleTheme();
       }
     });
 
